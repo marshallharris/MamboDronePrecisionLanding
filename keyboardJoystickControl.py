@@ -7,7 +7,7 @@ import cv2
 import edgeDetection
 import threading
 from datetime import datetime 
-
+import time
 
 def sessionName():
     now = datetime.now()
@@ -53,23 +53,20 @@ t1 = threading.Thread(target=keyboardControl)
 
 def download_images_and_take_image(mambo):
     global contourFrameToShow
-    if mambo.sensors.picture_state == "ready":
+    if mambo.sensors.picture_event == "taken":
+        mambo.take_picture()
         picture_names = mambo.groundcam.get_groundcam_pictures_names() #get list of availible files
         print(f"There are {len(picture_names)} pictures")
         for picture in picture_names:
             frame = mambo.groundcam.get_groundcam_picture(picture,True)
             if frame is not None and frame is not False:
-                print(f"downloading picture {picture}")
                 success = cv2.imwrite(os.path.join(sessionPath, picture), frame)
-                print(f"success? {success}")
                 mambo.groundcam._delete_file(picture)
+                beforeContours = time.time()
                 frameContours = frame.copy()
                 edgeDetection.getContoursOfImage(frame, frameContours)
                 cv2.imwrite(os.path.join(sessionPath, "contours_" + picture), frameContours)
                 contourFrameToShow = frameContours
-        mambo.take_picture()
-        mambo.smart_sleep(0.2)
-
 
 
 if __name__ == "__main__":
@@ -82,9 +79,11 @@ if __name__ == "__main__":
 
     
 
+    mambo.set_user_picture_event_callback(download_images_and_take_image, mambo)
     mambo.ask_for_state_update()
     mambo.smart_sleep(1)
-    mambo.set_user_sensor_callback(download_images_and_take_image, mambo)
+    mambo.take_picture()
+    mambo.smart_sleep(1)
 
     t1.start()
 
