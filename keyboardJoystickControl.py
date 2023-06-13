@@ -45,7 +45,7 @@ def autoTrackTarget():
                 roll, pitch = scaleTragectory(x, y)
                 print(f"tracking target roll {roll}, pitch {pitch}")
                 polarCoordsToTarget = None
-                mambo.fly_direct(roll, pitch, 0, 0, 1.0)
+                mambo.fly_direct(roll, pitch, 0, 0, 0.5)
         
 
 def keyboardControl():
@@ -105,7 +105,8 @@ def download_images_and_take_image(mambo):
                 beforeContours = time.time()
                 frameContours = frame.copy()
                 polarCoordsToTarget = edgeDetection.getContoursOfImage(frame, frameContours)
-                print(f"polar coords to target rho:{polarCoordsToTarget[0]}, phi{np.rad2deg(polarCoordsToTarget[1])}")
+                if polarCoordsToTarget is not None:
+                    print(f"polar coords to target rho:{polarCoordsToTarget[0]}, phi{np.rad2deg(polarCoordsToTarget[1])}")
                 cv2.imwrite(os.path.join(sessionPath, "contours_" + picture), frameContours)
                 contourFrameToShow = frameContours
 
