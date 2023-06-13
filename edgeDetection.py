@@ -22,7 +22,7 @@ def getPolarCoordsFromMiddleOfImage(middleOfContour):
     y = middleOfContour[1] - imageCenterYCoordinate
 
     rho = np.linalg.norm([x, y])
-    phi = np.rad2deg(np.arctan2(y, x))
+    phi = np.arctan2(y, x)
     return (rho, phi)
 
 def writeTextOnImage(text, image):
@@ -43,5 +43,7 @@ def getContoursOfImage(image, imgContour, cannyLowerThreshold=25, cannyUpperThre
     contourCenter = getLargestContourCenter(imgDil, imgContour)
     if contourCenter is not None:
         polarCoords = getPolarCoordsFromMiddleOfImage(contourCenter)
-        polarCoordsString = f"rho {polarCoords[0]:.3f}, phi {polarCoords[1]:.3f}"
+        polarCoordsString = f"rho {polarCoords[0]:.3f}, phi {np.rad2deg(polarCoords[1]):.3f}"
         writeTextOnImage(polarCoordsString, imgContour)
+        return polarCoords
+    return None
