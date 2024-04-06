@@ -28,13 +28,13 @@ def getPolarCoordsFromMiddleOfImage(middleOfContour):
 def writeTextOnImage(text, image):
     font = cv2.FONT_HERSHEY_SIMPLEX
     org = (50, 50)
-    fontScale = 1
+    fontScale = 0.5
     color = (255, 0, 0)
     thickness = 2
     image = cv2.putText(image, text, org, font, 
                    fontScale, color, thickness, cv2.LINE_AA)
 
-def getContoursOfImage(image, imgContour, cannyLowerThreshold=25, cannyUpperThreshold=150):
+def getContoursOfImage(image, imgContour, cannyLowerThreshold=25, cannyUpperThreshold=90):
     imgBlur = cv2.GaussianBlur(image, (7, 7), 1)
     grayscale = cv2.cvtColor(imgBlur, cv2.COLOR_BGR2GRAY)
     edge_image = cv2.Canny(grayscale, cannyLowerThreshold, cannyUpperThreshold)
@@ -43,7 +43,7 @@ def getContoursOfImage(image, imgContour, cannyLowerThreshold=25, cannyUpperThre
     contourCenter = getLargestContourCenter(imgDil, imgContour)
     if contourCenter is not None:
         polarCoords = getPolarCoordsFromMiddleOfImage(contourCenter)
-        polarCoordsString = f"rho {polarCoords[0]:.3f}, phi {np.rad2deg(polarCoords[1]):.3f}"
+        polarCoordsString = f"rho {polarCoords[0]:.3f}, phi {np.rad2deg(polarCoords[1]):.3f}, cL: {cannyLowerThreshold}, cU: {cannyUpperThreshold}"
         writeTextOnImage(polarCoordsString, imgContour)
         return polarCoords
     return None
