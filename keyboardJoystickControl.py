@@ -73,6 +73,12 @@ def keyboardControl():
             if ord(c) == 100: #d
                 mambo.fly_direct(20, 0, 0, 0)
                 print("go right")
+            if ord(c) == 101: #e
+                mambo.fly_direct(0, 0, 0, 20)
+                print("go up")
+            if ord(c) == 114: #r
+                mambo.fly_direct(0,0,0, -20)
+                print("go down")
             if ord(c) == 108: #l
                 print("land")
                 result = mambo.land()
