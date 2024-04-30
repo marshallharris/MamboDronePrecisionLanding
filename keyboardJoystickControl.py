@@ -28,14 +28,7 @@ polarCoordsToTarget = None
 autoTrackModeEnabled = False
 pictureTimestampQueue = []
 csvFile = None
-
-@dataclass
-class Frame:
-    rho: float
-    phi: float
-    timestamp: float
-
-mostRecentFrame = None
+mostRecentTarget = None
 
 
 def polarToCartesian(rho, phi):
@@ -45,7 +38,7 @@ def polarToCartesian(rho, phi):
 
 
 def autoTrackTargetPID():
-    global mostRecentFrame
+    global mostRecentTarget
     global autoTrackModeEnabled
     global mambo
     print("PID loop running sanity check")
@@ -63,16 +56,16 @@ def autoTrackTargetPID():
     while True:
         mambo.smart_sleep(0.1)
         T = cv2.getTrackbarPos("T", "Command_duration") / 100
-        if mostRecentFrame is not None:
+        if mostRecentTarget is not None:
             print("got most recent frame")
-            if mostRecentFrame.rho < 75:
+            if mostRecentTarget.rho < 75:
                 print("target acquired!!! Descending")
-                mambo.fly_direct(0,0,0, -20, 1.0)
+                mambo.fly_direct(0,0,0, -20, 1.0) # maybe try descending more when the target is higher
             if timestampPrior is not None:
-                timestamp = mostRecentFrame.timestamp
+                timestamp = mostRecentTarget.timestamp
                 iterationTime = timestamp - timestampPrior
-                x_error, y_error = polarToCartesian(mostRecentFrame.rho, mostRecentFrame.phi) # positive y is down in the image
-                error = mostRecentFrame.rho # how far off center in terms of pixels
+                x_error = mostRecentTarget.x_center - 320
+                y_error = mostRecentTarget.y_center - 240
                 x_integral = x_integralPrior + x_error * iterationTime
                 y_integral = y_integralPrior + y_error * iterationTime
                 x_derivative = (x_error - x_errorPrior) / iterationTime
@@ -82,7 +75,7 @@ def autoTrackTargetPID():
                 y_output = Kp * y_error + Ki * y_integral + Kd * y_derivative + bias
                 
                 roll = x_output
-                pitch = -y_output #invert because Y is positive id down direction of image
+                pitch = -y_output #invert because Y is positive in down direction of image
 
                 x_errorPrior = x_error
                 y_errorPrior = y_error
@@ -93,7 +86,7 @@ def autoTrackTargetPID():
                 
                 if autoTrackModeEnabled:
                     command_time = 1.0
-                    height_scale_factor = mambo.sensors.position_z * -1 / 150.0
+                    height_scale_factor = mambo.sensors.position_z * -1 / 150.0 # make this more intelligent by looking at size of target
                     data = [timestamp, iterationTime, Kp, Ki, Kd, x_error, x_integral, x_derivative, x_output, y_error, y_integral, y_derivative, y_output, command_time]
                     with open(os.path.join(sessionPath, "PID_Data.csv"), 'a') as f:
                         writer = csv.writer(f)
@@ -101,18 +94,20 @@ def autoTrackTargetPID():
                         writer.writerow(data)
                     print(f"tracking target roll {roll}, pitch {pitch}")
                     mambo.fly_direct(roll, pitch, 0, 0, command_time * height_scale_factor)
-                mostRecentFrame = None
+                mostRecentTarget = None
                 
             else:
                 print("setting timestamp prior")
-                timestampPrior = mostRecentFrame.timestamp
-                mostRecentFrame = None
+                timestampPrior = mostRecentTarget.timestamp
+                mostRecentTarget = None
+        elif autoTrackModeEnabled:
+            mambo.fly_direct(0,0,0,0, 0.1)
 
 
 def log_position(mambo):
     while True:
-        time.sleep(0.1)
-        data = [datetime.timestamp(datetime.now()), mambo.sensors.position_x, mambo.sensors.position_y, mambo.sensors.position_z]
+        mambo.smart_sleep(0.1)
+        data = [datetime.timestamp(datetime.now()), mambo.sensors.position_x, mambo.sensors.position_y, mambo.sensors.position_z, mambo.sensors.altitude]
         with open(os.path.join(sessionPath, "Position_Data.csv"), 'a') as f:
             writer = csv.writer(f)
             writer.writerow(data)
@@ -164,6 +159,7 @@ def keyboardControl():
 
 keyboardControlThread = threading.Thread(target=keyboardControl)
 pidAutoTrackThread = threading.Thread(target=autoTrackTargetPID)
+
 loggingThread = None
 
 
@@ -171,7 +167,7 @@ def download_images_and_take_image(mambo):
     global contourFrameToShow
     global polarCoordsToTarget
     global pictureTimestampQueue
-    global mostRecentFrame
+    global mostRecentTarget
     if mambo.sensors.picture_event == "taken":
         logging.info("take picture")
         mambo.take_picture()
@@ -186,10 +182,11 @@ def download_images_and_take_image(mambo):
                 mambo.groundcam._delete_file(picture)
                 beforeContours = time.time()
                 frameContours = frame.copy()
-                polarCoordsToTarget = edgeDetection.getContoursOfImage(frame, frameContours, 70, 170)
-                if polarCoordsToTarget is not None:
-                    mostRecentFrame = Frame(rho=polarCoordsToTarget[0], phi=polarCoordsToTarget[1], timestamp=pictureTimestampQueue.pop(0))
-                    print(f"polar coords to target rho:{polarCoordsToTarget[0]}, phi{np.rad2deg(polarCoordsToTarget[1])}")
+                target = edgeDetection.getContoursOfImage(frame, frameContours, 70, 170)
+                if target is not None:
+                    target.timestamp = pictureTimestampQueue.pop(0)
+                    mostRecentTarget = target
+                    print(f"Target x: {target.x_center}, y: {target.y_center}, width: {target.width}, height: {target.height}")
                 else:
                     pictureTimestampQueue.pop(0) # remove timestampe where contour can't be extracted
 
@@ -211,7 +208,7 @@ if __name__ == "__main__":
         print("write data to CSV")
         writer.writerow(data)
     with open(os.path.join(sessionPath, "Position_Data.csv"), 'a') as f:
-        data = ["timestamp", "pos_x", "pos_y", "pos_z"]
+        data = ["timestamp", "pos_x", "pos_y", "pos_z", "altitude"]
         writer = csv.writer(f)
         print("write data to CSV")
         writer.writerow(data)
