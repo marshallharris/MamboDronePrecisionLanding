@@ -58,10 +58,10 @@ def autoTrackTargetPID():
         T = cv2.getTrackbarPos("T", "Command_duration") / 100
         if mostRecentTarget is not None:
             print("got most recent frame")
-            if mostRecentTarget.rho < 75:
-                print("target acquired!!! Descending")
-                mambo.fly_direct(0,0,0, -20, 1.0) # maybe try descending more when the target is higher
-            if timestampPrior is not None:
+            if mostRecentTarget.rho < 75 and mostRecentTarget.percentOfImage() > 5:
+                print("target acquired!!! Landing")    
+                mambo.land()
+            elif timestampPrior is not None:
                 timestamp = mostRecentTarget.timestamp
                 iterationTime = timestamp - timestampPrior
                 x_error = mostRecentTarget.x_center - 320
@@ -92,14 +92,24 @@ def autoTrackTargetPID():
                         writer = csv.writer(f)
                         print("write PID data to CSV")
                         writer.writerow(data)
-                    print(f"tracking target roll {roll}, pitch {pitch}")
-                    mambo.fly_direct(roll, pitch, 0, 0, command_time * height_scale_factor)
-                mostRecentTarget = None
+                    timeComponent = 100/mostRecentTarget.percentOfImage()
+                    horizontalComponent = -20
+                    if mostRecentTarget.percentOfImage() > 2:
+                        horizontalComponent = -10
+                    if mostRecentTarget.percentOfImage() > 4:
+                        horizontalComponent = -5
+                    if mostRecentTarget.percentOfImage() > 8 :
+                        horizontalComponent = 0
+
+                    if timeComponent > 30:
+                        timeComponent = 30
+                    print(f"tracking target roll {roll}, pitch {pitch} percent {mostRecentTarget.percentOfImage()}, time {timeComponent/100 * 3.0}")
+                    mambo.fly_direct(roll, pitch, 0, horizontalComponent, timeComponent/100 * 3.0)
                 
             else:
                 print("setting timestamp prior")
                 timestampPrior = mostRecentTarget.timestamp
-                mostRecentTarget = None
+            mostRecentTarget = None
         elif autoTrackModeEnabled:
             mambo.fly_direct(0,0,0,0, 0.1)
 
@@ -182,7 +192,8 @@ def download_images_and_take_image(mambo):
                 mambo.groundcam._delete_file(picture)
                 beforeContours = time.time()
                 frameContours = frame.copy()
-                target = edgeDetection.getContoursOfImage(frame, frameContours, 70, 170)
+                # 230, 245 are canny values for patterned carpet
+                target = edgeDetection.getContoursOfImage(frame, frameContours, 230, 245)
                 if target is not None:
                     target.timestamp = pictureTimestampQueue.pop(0)
                     mostRecentTarget = target
