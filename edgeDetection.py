@@ -21,16 +21,18 @@ def getTargetContourCenterAndSize(img, grayscaleImage, imgContour):
             continue
         hull = ConvexHull(reshaped_approx)
         # graphConvexHull(hull, reshaped_approx)
-        if(hull.area > largestArea):
-            largestArea = hull.area
+        # hull.volume actually gives the area when dimension is 2D
+        if(hull.volume > largestArea):
+            largestArea = hull.volume
             setOfPointsRepresentingLargestApproxContour = approx
             roiPoints = approx[hull.vertices]
-    brightnessThresholdForWhitePaper = 185
+
+    brightnessThresholdForWhitePaper = 130
     if largestArea > 0 and averageBrightnessAcrossConvexHull(grayscaleImage, roiPoints) > brightnessThresholdForWhitePaper:
         x, y, w, h = cv2.boundingRect(setOfPointsRepresentingLargestApproxContour)
         cv2.rectangle(imgContour, (x, y), (x +w, y + h), (0, 255, 0), 5)
         rhoAndPhi = getPolarCoordsFromMiddleOfImage(x + w/2, y + h/2)
-        return Target(x_center=x + w/2, y_center=y + h/2, width=w, height=h, rho=rhoAndPhi[0], phi=rhoAndPhi[1], timestamp=0.0)
+        return Target(x_center=x + w/2, y_center=y + h/2, area=largestArea, width=w, height=h, rho=rhoAndPhi[0], phi=rhoAndPhi[1], timestamp=0.0)
     return None
 
 def averageBrightnessAcrossConvexHull(image, roi_corners):
@@ -66,9 +68,8 @@ def getPolarCoordsFromMiddleOfImage(target_center_x, target_center_y):
     phi = np.arctan2(y, x)
     return (rho, phi)
 
-def writeTextOnImage(text, image):
+def writeTextOnImage(text, image, org):
     font = cv2.FONT_HERSHEY_SIMPLEX
-    org = (50, 50)
     fontScale = 0.5
     color = (255, 0, 0)
     thickness = 2
@@ -85,7 +86,9 @@ def getContoursOfImage(image, imgContour, cannyLowerThreshold=25, cannyUpperThre
 
     target = getTargetContourCenterAndSize(imgDil, grayscale,imgContour)
     if target is not None:
-        debuggingString = f"{target.__repr__()}, cL: {cannyLowerThreshold}, cU: {cannyUpperThreshold}"
-        writeTextOnImage(debuggingString, imgContour)
+        dimensionString = f"{target.stringForImage()}"
+        cannyThresholdsString= f"area {target.area},cL: {cannyLowerThreshold}, cU: {cannyUpperThreshold}"
+        writeTextOnImage(dimensionString, imgContour, (50, 50))
+        writeTextOnImage(cannyThresholdsString, imgContour, (50, 80))
         return target
     return None
