@@ -8,6 +8,7 @@ def empty(a):
 def parseArgs():
     parser = argparse.ArgumentParser(description="Filename of image to do edge detection on")
     parser.add_argument("filename")
+    parser.add_argument("--plot", action="store_true", help="Plot each convex hull")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -24,8 +25,8 @@ if __name__ == "__main__":
         threshold1 = cv2.getTrackbarPos("Threshold1", "Parameters")
         threshold2 = cv2.getTrackbarPos("Threshold2", "Parameters")
         imageContour = image.copy()
-        edgeDetection.getContoursOfImage(image, imageContour, threshold1, threshold2)
+        edgeDetection.getContoursOfImage(image, imageContour, threshold1, threshold2, args.plot)
 
         cv2.imshow("Groundcam", imageContour)
-        if cv2.waitKey(500) == ord('q'):
+        if cv2.waitKey(3000) == ord('q'):
             break
